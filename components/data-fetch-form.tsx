@@ -217,7 +217,7 @@ export function DataFetchForm() {
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>
-        <CardTitle>Data Fetch Form</CardTitle>
+        <CardTitle>Hateful Meme Detector</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center space-x-4">
