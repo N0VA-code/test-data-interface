@@ -1,3 +1,4 @@
+"use client";
 import React, {useState} from "react";
 import {database} from "./firebase";
 import {ref, get, update} from "firebase/database";
@@ -157,6 +158,7 @@ const FirebaseDataFetcher = () => {
   return (
     <div>
       <input
+        className="text-black"
         type="text"
         value={index}
         onChange={(e) => setIndex(e.target.value)}
