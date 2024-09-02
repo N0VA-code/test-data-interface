@@ -1,7 +1,6 @@
 // Import the functions you need from the SDKs you need
-import {initializeApp} from "firebase/app";
-import {getAnalytics} from "firebase/analytics";
-import {getDatabase} from "firebase/database"; // 추가
+import { initializeApp } from "firebase/app";
+import { getDatabase } from "firebase/database"; // 추가
 
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -21,7 +20,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const database = getDatabase(app); // 추가
 
-export {database}; // 추가
+// Export the initialized app and database
+export const database = getDatabase(app);
+export default app;
