@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { database } from "@/app/firebase/firebase";
-import { ref, get, update } from "firebase/database";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import {useState} from "react";
+
+import {database} from "@/app/firebase/firebase";
+import {ref, get, update} from "firebase/database";
+
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Textarea} from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -14,37 +16,33 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
+import {ChevronLeft, ChevronRight} from "lucide-react";
 interface FormData {
   image_caption: string;
   surface_message: string;
   background_knowledge: string[];
   implicit_message: string[];
   label: string;
+  [key: string]: string | string[];
 }
-
-const DataFetchForm = () => {
+// interface FormData {
+//    // Adjust the type according to the actual structure of your form data
+// }
+export function DataFetchForm() {
   const [index, setIndex] = useState("");
-  const [data, setData] = useState<FormData | null>(null);
+  const [data, setData] = useState<Record<string, any> | null>(null);
+
   const [error, setError] = useState("");
-  const [isSaved, setIsSaved] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     image_caption: "",
     surface_message: "",
     background_knowledge: [""],
     implicit_message: [""],
-    label: ""
+    label: "",
   });
 
-  useEffect(() => {
-    // 클라이언트 측에서만 실행되는 코드
-    if (typeof window !== "undefined") {
-      // window 객체를 참조하는 코드
-    }
-  }, []);
-
-  const fetchData = async (newIndex = index) => {
+  const fetchData = async (newIndex: string) => {
+    setIndex(newIndex);
     if (!newIndex) {
       setError("Please enter a valid index.");
       return;
@@ -56,82 +54,132 @@ const DataFetchForm = () => {
     try {
       const dbRef = ref(database, `/${newIndex}`);
       const snapshot = await get(dbRef);
-
       if (snapshot.exists()) {
         const fetchedData = snapshot.val();
-        const orderedKeys = ["img", "text", "image_caption", "surface_message", "background_knowledge", "implicit_message", "label"];
-        const filteredData = orderedKeys.reduce((acc, key) => {
-          if (fetchedData[key] !== undefined) {
-            acc[key] = fetchedData[key];
-          }
-          return acc;
-        }, {});
+        const orderedKeys = [
+          "img",
+          "text",
+          "image_caption",
+          "surface_message",
+          "background_knowledge",
+          "implicit_message",
+          "label",
+        ];
+        const filteredData: Record<string, any> = orderedKeys.reduce(
+          (acc: Record<string, any>, key: string) => {
+            if (fetchedData[key] !== undefined) {
+              acc[key] = fetchedData[key];
+            }
+            return acc;
+          },
+          {},
+        );
         setData(filteredData);
         setFormData({
           image_caption: fetchedData.image_caption || "",
           surface_message: fetchedData.surface_message || "",
-          background_knowledge: parseStringToArray(fetchedData.background_knowledge),
+          background_knowledge: parseStringToArray(
+            fetchedData.background_knowledge,
+          ),
           implicit_message: parseImplicitMessage(fetchedData.implicit_message),
-          label: fetchedData.label || ""
+          label: fetchedData.label || "",
         });
-        setIndex(newIndex);
+        // setIndex(newIndex);
       } else {
         setError("No data available at this index.");
       }
-    } catch (err) {
-      setError("Error fetching data: " + err.message);
+      // 내가 임의로 추가
+      setIsSaved(false);
+    } catch (err: unknown) {
+      // Use 'unknown' to ensure type safety
+      if (err instanceof Error) {
+        setError("Error fetching data: " + err.message);
+      } else {
+        setError("Error fetching data: An unknown error occurred");
+      }
     }
   };
 
+  const formatArrayToString = (arr: string[]): string => {
+    return arr
+      .map((item, index) => `'${index + 1}. ${item.trim()}'`)
+      .join(", ");
+  };
+
+  const formatImplicitMessageToString = (arr: string[]): string => {
+    return arr.map((item) => `'${item.trim()}'`).join(", ");
+  };
   const parseStringToArray = (str: string) => {
     if (typeof str === "string") {
-      return str.replace(/[\[\]',]/g, '').split(/(?:\d+\.\s)/).filter(Boolean).map(item => item.trim());
+      return str
+        .replace(/[\[\]',]/g, "")
+        .split(/(?:\d+\.\s)/)
+        .filter(Boolean)
+        .map((item) => item.trim());
     }
     return [str];
   };
 
-  const parseImplicitMessage = (str: string) => {
-    if (typeof str === "string") {
-      return str.replace(/[\[\]']/g, '').split(/\s*,\s*/).filter(item => item.length >= 12).map(item => item.trim());
-    }
-    return [str];
-  };
+  interface EventTargetWithName extends EventTarget {
+    name: string;
+    value: string;
+  }
 
-  const formatArrayToString = (arr: string[]) => {
-    return arr.map((item, index) => `'${index + 1}. ${item.trim()}'`).join(', ');
-  };
-
-  const formatImplicitMessageToString = (arr: string[]) => {
-    return arr.map(item => `'${item.trim()}'`).join(', ');
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ): void => {
+    const {name, value} = e.target as EventTargetWithName;
     const [field, index] = name.split("-");
-    if (field === "label" && (value !== "0" && value !== "1")) {
-      setError("Label must be 0 or 1.");
-      return;
-    }
+    setIsSaved(false);
     if (index !== undefined) {
-      const updatedArray = [...formData[field]];
+      const updatedArray = [...(formData[field] as string[])];
       updatedArray[parseInt(index, 10)] = value;
       setFormData({
         ...formData,
-        [field]: updatedArray
+        [field]: updatedArray,
       });
     } else {
       setFormData({
         ...formData,
-        [field]: value
+        [field]: value,
       });
     }
   };
 
-  const addArrayElement = (field: string) => {
-    setFormData({
-      ...formData,
-      [field]: [...formData[field], ""]
-    });
+  const parseImplicitMessage = (str: string) => {
+    if (typeof str === "string") {
+      return str
+        .replace(/[\[\]']/g, "")
+        .split(/\s*,\s*/)
+        .filter((item) => item.length >= 12)
+        .map((item) => item.trim());
+    }
+    return [str];
+  };
+  const [isSaved, setIsSaved] = useState(false);
+
+  const handlePrev = () => {
+    const decrementedIndex = parseInt(index, 10) - 1;
+    let stringIndex = decrementedIndex.toString();
+    setIndex(stringIndex);
+    if (decrementedIndex >= 0) {
+      fetchData(decrementedIndex.toString());
+    }
+  };
+  const handleNext = () => {
+    let incrementedIndex = parseInt(index, 10) + 1;
+    let stringIndex = incrementedIndex.toString();
+    setIndex(stringIndex);
+    fetchData(stringIndex);
+  };
+  const addArrayElement = (field: keyof FormData): void => {
+    // Ensure the field is an array before spreading
+    if (Array.isArray(formData[field])) {
+      setFormData({
+        ...formData,
+        [field]: [...(formData[field] as string[]), ""],
+      });
+    }
   };
 
   const saveData = async () => {
@@ -160,127 +208,145 @@ const DataFetchForm = () => {
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError("Error updating data: " + err.message);
+      } else {
+        setError("Error updating data: An unknown error occurred");
       }
     }
   };
 
-  const handlePrev = () => {
-    const prevIndex = parseInt(index, 10) - 1;
-    if (prevIndex >= 0) {
-      fetchData(prevIndex.toString());
-    }
-  };
-
-  const handleNext = () => {
-    const nextIndex = parseInt(index, 10) + 1;
-    fetchData(nextIndex.toString());
-  };
-
   return (
-    <div>
-      <Input
-        type="text"
-        value={index}
-        onChange={(e) => setIndex(e.target.value)}
-        placeholder="Enter index"
-      />
-      <Button onClick={fetchData}>Fetch Data</Button>
-      <Button onClick={handlePrev}>Prev</Button>
-      <Button onClick={handleNext}>Next</Button>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      {data && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Data</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.img && (
-              <div>
-                <strong>img:</strong>
-                <img src={`https://personal.utdallas.edu/~jxp220018/${data.img}`} alt="Fetched" />
-              </div>
-            )}
-            {data.text && (
-              <div>
-                <strong>text:</strong> {data.text}
-              </div>
-            )}
-            {Object.entries(data).map(([key, value]) => (
-              key !== "img" && key !== "text" && (
-                <div key={key}>
-                  <strong>{key}:</strong>
-                  {key === "label" ? (
-                    <>
-                      <span>{value}</span>
+    <Card className="w-full max-w-3xl mx-auto">
+      <CardHeader>
+        <CardTitle>Hateful Meme Detector</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center space-x-4">
+          {data && (
+            <Button
+              onClick={handlePrev}
+              variant="outline"
+              size="icon"
+              disabled={parseInt(index) <= 0}>
+              <ChevronLeft className="h-4 w-4" />
+              <span className="sr-only">Previous</span>
+            </Button>
+          )}
+          <div className="flex space-x-4 w-full">
+            <div className="flex-grow">
+              <Label htmlFor="index">Index</Label>
+              <Input
+                id="index"
+                value={index}
+                onChange={(e) => setIndex(e.target.value)}
+                placeholder="Enter index"
+              />
+            </div>
+            <Button onClick={() => fetchData(index)} className="mt-auto">
+              Fetch data
+            </Button>
+          </div>
+          {data && (
+            <Button onClick={handleNext} variant="outline" size="icon">
+              <ChevronRight className="h-4 w-4" />
+              <span className="sr-only">Next</span>
+            </Button>
+          )}
+        </div>
+        {data && (
+          <div className="space-y-4">
+            <div>
+              <Label>Image</Label>
+              <img
+                src={`https://personal.utdallas.edu/~jxp220018/${data.img}`}
+                alt="Fetched"
+                className="mt-2 border rounded"
+              />
+            </div>
+            <div>
+              <Label htmlFor="text">Text</Label>
+              <Textarea id="text" value={data.text} readOnly className="mt-1" />
+            </div>
+            {Object.entries(data).map(
+              ([key, value]) =>
+                key !== "img" &&
+                key !== "text" && (
+                  <div key={key}>
+                    <Label>{key}:</Label>
+                    {key === "label" ? (
+                      <>
+                        {/* <span>{value}</span> */}
+                        <Input
+                          type="number"
+                          name={key}
+                          value={formData[key]}
+                          onChange={handleInputChange}
+                          min="0"
+                          max="1"
+                        />
+                      </>
+                    ) : key === "background_knowledge" ? (
+                      <>
+                        {formData[key].map((item, idx) => (
+                          <div key={`${key}-${idx}`}>
+                            <Label>{`Background Knowledge ${idx + 1}`}</Label>
+                            <Input
+                              className="mt-1"
+                              type="text"
+                              name={`${key}-${idx}`}
+                              value={item}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                        ))}
+                        <Button
+                          className="mt-2"
+                          variant="outline"
+                          onClick={() => addArrayElement(key)}>
+                          Add {key}
+                        </Button>
+                      </>
+                    ) : key === "implicit_message" ? (
+                      <>
+                        {formData[key].map((item, idx) => (
+                          <div key={`${key}-${idx}`}>
+                            <Input
+                              className="mt-2"
+                              type="text"
+                              name={`${key}-${idx}`}
+                              value={item}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                        ))}
+                        <Button
+                          className="mt-2"
+                          variant="outline"
+                          onClick={() => addArrayElement(key)}>
+                          Add {key}
+                        </Button>
+                      </>
+                    ) : (
                       <Input
-                        type="number"
+                        type="text"
                         name={key}
                         value={formData[key]}
                         onChange={handleInputChange}
-                        min="0"
-                        max="1"
                       />
-                    </>
-                  ) : key === "background_knowledge" ? (
-                    <>
-                      {formData[key].map((item, idx) => (
-                        <div key={`${key}-${idx}`}>
-                          <Label>{`Background Knowledge ${idx + 1}`}</Label>
-                          <Input
-                            className="mt-1"
-                            type="text"
-                            name={`${key}-${idx}`}
-                            value={item}
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                      ))}
-                      <Button
-                        className="mt-2"
-                        variant="outline"
-                        onClick={() => addArrayElement(key)}>
-                        Add {key}
-                      </Button>
-                    </>
-                  ) : key === "implicit_message" ? (
-                    <>
-                      {formData[key].map((item, idx) => (
-                        <div key={`${key}-${idx}`}>
-                          <Input
-                            className="mt-2"
-                            type="text"
-                            name={`${key}-${idx}`}
-                            value={item}
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                      ))}
-                      <Button
-                        className="mt-2"
-                        variant="outline"
-                        onClick={() => addArrayElement(key)}>
-                        Add {key}
-                      </Button>
-                    </>
-                  ) : (
-                    <Input
-                      type="text"
-                      name={key}
-                      value={formData[key]}
-                      onChange={handleInputChange}
-                    />
-                  )}
-                </div>
-              )
-            ))}
-          </CardContent>
-          <CardFooter>
-            <Button onClick={saveData}>Save</Button>
-          </CardFooter>
-        </Card>
-      )}
-    </div>
-  );
-};
+                    )}
+                  </div>
+                ),
+            )}
+            <Button
+              onClick={saveData}
+              className="w-full"
+              disabled={!data || isSaved}>
+              {isSaved ? "Saved" : "Save"}
+            </Button>
 
-export default DataFetchForm;
+            {error && <p style={{color: "red"}}>{error}</p>}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
