@@ -1,14 +1,12 @@
 "use client";
 
-import {useState} from "react";
-
-import {database} from "@/app/firebase/firebase";
-import {ref, get, update} from "firebase/database";
-
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Textarea} from "@/components/ui/textarea";
+import { useState } from "react";
+import { database } from "@/app/firebase/firebase";
+import { ref, get, update } from "firebase/database";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -16,7 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {ChevronLeft, ChevronRight} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 interface FormData {
   image_caption: string;
   surface_message: string;
@@ -25,13 +24,10 @@ interface FormData {
   label: string;
   [key: string]: string | string[];
 }
-// interface FormData {
-//    // Adjust the type according to the actual structure of your form data
-// }
+
 export function DataFetchForm() {
   const [index, setIndex] = useState("");
   const [data, setData] = useState<Record<string, any> | null>(null);
-
   const [error, setError] = useState("");
   const [formData, setFormData] = useState<FormData>({
     image_caption: "",
@@ -40,6 +36,7 @@ export function DataFetchForm() {
     implicit_message: [""],
     label: "",
   });
+  const [isSaved, setIsSaved] = useState(false);
 
   const fetchData = async (newIndex: string) => {
     setIndex(newIndex);
@@ -72,26 +69,25 @@ export function DataFetchForm() {
             }
             return acc;
           },
-          {},
+          {}
         );
         setData(filteredData);
         setFormData({
           image_caption: fetchedData.image_caption || "",
           surface_message: fetchedData.surface_message || "",
-          background_knowledge: parseStringToArray(
-            fetchedData.background_knowledge,
-          ),
-          implicit_message: parseImplicitMessage(fetchedData.implicit_message),
+          background_knowledge: Array.isArray(fetchedData.background_knowledge)
+            ? fetchedData.background_knowledge
+            : [""],
+          implicit_message: Array.isArray(fetchedData.implicit_message)
+            ? fetchedData.implicit_message
+            : [""],
           label: fetchedData.label || "",
         });
-        // setIndex(newIndex);
+        setIsSaved(false);
       } else {
         setError("No data available at this index.");
       }
-      // 내가 임의로 추가
-      setIsSaved(false);
     } catch (err: unknown) {
-      // Use 'unknown' to ensure type safety
       if (err instanceof Error) {
         setError("Error fetching data: " + err.message);
       } else {
@@ -100,35 +96,15 @@ export function DataFetchForm() {
     }
   };
 
-  const formatArrayToString = (arr: string[]): string => {
-    return arr
-      .map((item, index) => `'${index + 1}. ${item.trim()}'`)
-      .join(", ");
-  };
-
-  const formatImplicitMessageToString = (arr: string[]): string => {
-    return arr.map((item) => `'${item.trim()}'`).join(", ");
-  };
-  const parseStringToArray = (str: string) => {
-    if (typeof str === "string") {
-      return str
-        .replace(/[\[\]',]/g, "")
-        .split(/(?:\d+\.\s)/)
-        .filter(Boolean)
-        .map((item) => item.trim());
-    }
-    return [str];
-  };
-
   interface EventTargetWithName extends EventTarget {
     name: string;
     value: string;
   }
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ): void => {
-    const {name, value} = e.target as EventTargetWithName;
+    const { name, value } = e.target as EventTargetWithName;
     const [field, index] = name.split("-");
     setIsSaved(false);
     if (index !== undefined) {
@@ -146,18 +122,6 @@ export function DataFetchForm() {
     }
   };
 
-  const parseImplicitMessage = (str: string) => {
-    if (typeof str === "string") {
-      return str
-        .replace(/[\[\]']/g, "")
-        .split(/\s*,\s*/)
-        .filter((item) => item.length >= 12)
-        .map((item) => item.trim());
-    }
-    return [str];
-  };
-  const [isSaved, setIsSaved] = useState(false);
-
   const handlePrev = () => {
     const decrementedIndex = parseInt(index, 10) - 1;
     let stringIndex = decrementedIndex.toString();
@@ -166,14 +130,15 @@ export function DataFetchForm() {
       fetchData(decrementedIndex.toString());
     }
   };
+
   const handleNext = () => {
     let incrementedIndex = parseInt(index, 10) + 1;
     let stringIndex = incrementedIndex.toString();
     setIndex(stringIndex);
     fetchData(stringIndex);
   };
+
   const addArrayElement = (field: keyof FormData): void => {
-    // Ensure the field is an array before spreading
     if (Array.isArray(formData[field])) {
       setFormData({
         ...formData,
@@ -187,22 +152,21 @@ export function DataFetchForm() {
       setError("Label must be 0 or 1.");
       return;
     }
+
+    // 빈 문자열을 제거하는 로직 추가
+    const cleanedFormData = {
+      ...formData,
+      background_knowledge: formData.background_knowledge.filter(
+        (item) => item.trim() !== ""
+      ),
+      implicit_message: formData.implicit_message.filter(
+        (item) => item.trim() !== ""
+      ),
+    };
+
     try {
       const dbRef = ref(database, `/${index}`);
-      const formattedData = {
-        ...formData,
-        background_knowledge: `[${formatArrayToString(
-          formData.background_knowledge.filter(
-            (item: string) => item.trim() !== "",
-          ),
-        )}]`,
-        implicit_message: `[${formatImplicitMessageToString(
-          formData.implicit_message.filter(
-            (item: string) => item.trim() !== "",
-          ),
-        )}]`,
-      };
-      await update(dbRef, formattedData);
+      await update(dbRef, cleanedFormData);
       setError("Data updated successfully.");
       setIsSaved(true);
     } catch (err: unknown) {
@@ -226,7 +190,8 @@ export function DataFetchForm() {
               onClick={handlePrev}
               variant="outline"
               size="icon"
-              disabled={parseInt(index) <= 0}>
+              disabled={parseInt(index) <= 0}
+            >
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Previous</span>
             </Button>
@@ -273,55 +238,56 @@ export function DataFetchForm() {
                   <div key={key}>
                     <Label>{key}:</Label>
                     {key === "label" ? (
-                      <>
-                        {/* <span>{value}</span> */}
-                        <Input
-                          type="number"
-                          name={key}
-                          value={formData[key]}
-                          onChange={handleInputChange}
-                          min="0"
-                          max="1"
-                        />
-                      </>
+                      <Input
+                        type="number"
+                        name={key}
+                        value={formData[key]}
+                        onChange={handleInputChange}
+                        min="0"
+                        max="1"
+                      />
                     ) : key === "background_knowledge" ? (
                       <>
-                        {formData[key].map((item, idx) => (
-                          <div key={`${key}-${idx}`}>
-                            <Label>{`Background Knowledge ${idx + 1}`}</Label>
-                            <Input
-                              className="mt-1"
-                              type="text"
-                              name={`${key}-${idx}`}
-                              value={item}
-                              onChange={handleInputChange}
-                            />
-                          </div>
-                        ))}
+                        {Array.isArray(formData[key]) &&
+                          formData[key].map((item, idx) => (
+                            <div key={`${key}-${idx}`}>
+                              <Label>{`Background Knowledge ${idx + 1}`}</Label>
+                              <Input
+                                className="mt-1"
+                                type="text"
+                                name={`${key}-${idx}`}
+                                value={item}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                          ))}
                         <Button
                           className="mt-2"
                           variant="outline"
-                          onClick={() => addArrayElement(key)}>
+                          onClick={() => addArrayElement(key)}
+                        >
                           Add {key}
                         </Button>
                       </>
                     ) : key === "implicit_message" ? (
                       <>
-                        {formData[key].map((item, idx) => (
-                          <div key={`${key}-${idx}`}>
-                            <Input
-                              className="mt-2"
-                              type="text"
-                              name={`${key}-${idx}`}
-                              value={item}
-                              onChange={handleInputChange}
-                            />
-                          </div>
-                        ))}
+                        {Array.isArray(formData[key]) &&
+                          formData[key].map((item, idx) => (
+                            <div key={`${key}-${idx}`}>
+                              <Input
+                                className="mt-2"
+                                type="text"
+                                name={`${key}-${idx}`}
+                                value={item}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                          ))}
                         <Button
                           className="mt-2"
                           variant="outline"
-                          onClick={() => addArrayElement(key)}>
+                          onClick={() => addArrayElement(key)}
+                        >
                           Add {key}
                         </Button>
                       </>
@@ -334,16 +300,17 @@ export function DataFetchForm() {
                       />
                     )}
                   </div>
-                ),
+                )
             )}
             <Button
               onClick={saveData}
               className="w-full"
-              disabled={!data || isSaved}>
+              disabled={!data || isSaved}
+            >
               {isSaved ? "Saved" : "Save"}
             </Button>
 
-            {error && <p style={{color: "red"}}>{error}</p>}
+            {error && <p style={{ color: "red" }}>{error}</p>}
           </div>
         )}
       </CardContent>
